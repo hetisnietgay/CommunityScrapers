@@ -6,7 +6,7 @@ performerByURL:
     scraper: performerScraper
 performerByName:
   action: scrapeXPath
-  queryURL: "https://www.boobpedia.com/wiki/index.php?title=Special%3ASearch&search={}"
+  queryURL: "https://www.boobpedia.com/wiki/index.php?title=Special%3ASearch&fulltext=1&search={}"
   scraper: performerSearch
 xPathScrapers:
   performerSearch:

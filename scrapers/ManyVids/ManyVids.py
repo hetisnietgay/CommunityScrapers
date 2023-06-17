@@ -4,7 +4,7 @@ import re
 import sys
 from urllib.parse import quote_plus
 from difflib import get_close_matches
-from typing import TypedDict
+from typing import List, Tuple, TypedDict
 
 # to import from a parent directory we need to add that directory to the system path
 csd = os.path.dirname(
@@ -272,7 +272,7 @@ def scrape_performer(performer_url: str) -> None:
     print("{}")
 
 
-def search_names(name: str, url: str) -> list[tuple[str, str]]:
+def search_names(name: str, url: str) -> List[Tuple[str, str]]:
     xpath_url = '//h4[contains(@class,"profile-pic-name")]/a[@title]/@href'
     xpath_name = '//h4[contains(@class,"profile-pic-name")]/a[@title]/text()[1]'
 
