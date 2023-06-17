@@ -3,6 +3,8 @@ import os
 import re
 import sys
 from urllib.parse import quote_plus
+from difflib import get_close_matches
+from typing import TypedDict
 
 # to import from a parent directory we need to add that directory to the system path
 csd = os.path.dirname(
@@ -39,7 +41,7 @@ def get_request(url: str) -> requests.Response():
     """
     mv_headers = {
         "User-Agent":
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:79.0) Gecko/20100101 Firefox/79.0',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/114.0',
         "Referer": "https://www.manyvids.com/"
     }
     return requests.get(url, headers=mv_headers, timeout=(3, 10))
@@ -50,7 +52,7 @@ def post_request(url: str, jsonBody:str) -> requests.Response():
     """
     mv_headers = {
         "User-Agent":
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:79.0) Gecko/20100101 Firefox/79.0',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/114.0',
         "Referer": "https://www.manyvids.com/"
     }
     return requests.post(url, json=jsonBody, headers=mv_headers, timeout=(3, 10))
@@ -270,34 +272,53 @@ def scrape_performer(performer_url: str) -> None:
     print("{}")
 
 
-def performer_by_name(name: str, max_results: int = 25) -> None:
-    performers = []
-    if name:
-        search_url = f'https://www.manyvids.com/MVGirls/?keywords={name}&search_type=0&sort=10&page=1'
-        xpath_url = '//h4[contains(@class,"profile-pic-name")]/a[@title]/@href'
-        xpath_name = '//h4[contains(@class,"profile-pic-name")]/a[@title]/text()[1]'
+def search_names(name: str, url: str) -> list[tuple[str, str]]:
+    xpath_url = '//h4[contains(@class,"profile-pic-name")]/a[@title]/@href'
+    xpath_name = '//h4[contains(@class,"profile-pic-name")]/a[@title]/text()[1]'
+
     try:
-        response = get_request(search_url)
+        response = get_request(url)
         root = html.fromstring(response.content)
         names = root.xpath(xpath_name)
         urls = root.xpath(xpath_url)
-        if len(names) != len(urls):
-            log.warning("Names/URL mismatch! Aborting")
-        else:
-            if max_results > len(names):
-                max_results = len(names)
-            log.debug(f"Found {max_results} performers with name {name}")
-            for i in range(0, max_results):
-                performers.append({"name": names[i].strip(), "url": urls[i]})
     except Exception as search_exc:
         log.error(f"Failed to search for performer {name}: {search_exc}")
-    print(json.dumps(performers))
+
+    names = list(map(lambda name: name.strip(), names))
+
+    scraped_performer_keys = ("name", "url")
+    performers = [dict(zip(scraped_performer_keys, performer)) for performer in zip(names, urls) if get_close_matches(name, [performer[0]], 1)]
+    
+    return performers
+
+def performer_by_name(name: str, max_results: int = 40) -> None:
+    performers = []
+    search_url = f'https://www.manyvids.com/MVGirls/?keywords={name}&search_type=0&sort=10&page=1'
+    search_url_2 = f'https://www.manyvids.com/MVTrans/?keywords={name}&search_type=0&sort=10&page=1'
+
+    if name:
+        performers = search_names(name, search_url)
+        log.debug(performers)
+
+        if not performers:
+            performers = search_names(name, search_url_2)
+        elif len(performers) < 5:
+            performers.append(search_names(name, search_url_2)[0])
+
+        names = get_close_matches(name, [creator['name'] for creator in performers], 10)
+        performers.sort(key=lambda performer:names.index(performer['name']))
+
+        log.debug(f"Found {len(performers)} performers with name {name}")
+        #log.debug(performers)
+
+        print(json.dumps([guy for guy in performers]))
+
     
 def scene_by_name(name: str) -> None:
     if name:
         search_url = f'https://api.journey-bff.kiwi.manyvids.com/api/v1/search/all'
     try:
-        response  = post_request(search_url, jsonBody={'keywords':name})
+        response = post_request(search_url, jsonBody={'keywords':name})
         # log.debug(response.request.body)
         # log.debug(response.content)
         meta = response.json()  
